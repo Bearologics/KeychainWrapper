@@ -5,19 +5,27 @@ public typealias KeychainKey = String
 
 public class KeychainWrapper {
     private let service: String
-    
-    public init(service: String) {
+    private let accessGroup: String?
+
+    public init(service: String, accessGroup: String? = nil) {
         self.service = service
+        self.accessGroup = accessGroup
     }
     
     private func keychainQuery(withService service: KeychainService, forKey key: KeychainKey) -> [String: Any] {
-        return [
+        var keychainQueryDict: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
             kSecAttrSynchronizable as String: kCFBooleanTrue!
         ]
+        
+        if let accessGroup = accessGroup {
+            keychainQueryDict[kSecAttrAccessGroup as String] = accessGroup
+        }
+        
+        return keychainQueryDict
     }
     
     @discardableResult
