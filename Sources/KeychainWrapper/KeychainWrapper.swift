@@ -2,76 +2,31 @@ import Foundation
 
 public typealias KeychainService = String
 public typealias KeychainKey = String
+typealias KeychainQuery = [String: Any]
 
-public class KeychainWrapper {
-    private let service: String
-    private let accessGroup: String?
-
+public final class KeychainWrapper: Sendable {
+    let implementation: KeychainImplementable
+    
     public init(service: String, accessGroup: String? = nil) {
-        self.service = service
-        self.accessGroup = accessGroup
+        self.implementation = KeychainImplementation(service: service, accessGroup: accessGroup)
     }
     
-    private func keychainQuery(withService service: KeychainService, forKey key: KeychainKey) -> [String: Any] {
-        var keychainQueryDict: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
-            kSecAttrSynchronizable as String: kCFBooleanTrue!
-        ]
-        
-        if let accessGroup = accessGroup {
-            keychainQueryDict[kSecAttrAccessGroup as String] = accessGroup
-        }
-        
-        return keychainQueryDict
+    init(implementation: KeychainImplementable) {
+        self.implementation = implementation
     }
-    
+        
     @discardableResult
     public func set(_ string: String, forKey key: KeychainKey) -> Bool {
-        var query = keychainQuery(withService: service, forKey: key)
-        
-        guard let data = string.data(using: .utf8) else {
-            return false
-        }
-        
-        guard SecItemCopyMatching(query as CFDictionary, nil) == noErr else {
-            query[kSecValueData as String] = data
-            let status = SecItemAdd(query as CFDictionary, nil)
-            return status == errSecSuccess
-        }
-        
-        return SecItemUpdate(
-            query as CFDictionary,
-            NSDictionary(dictionary: [kSecValueData: data])
-        ) == errSecSuccess
+        implementation.set(string, forKey: key)
     }
     
     public func get(stringForKey key: KeychainKey) -> String? {
-        var query = keychainQuery(withService: service, forKey: key)
-        query[kSecReturnData as String] = kCFBooleanTrue
-        query[kSecReturnAttributes as String] = kCFBooleanTrue
-        
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == noErr else {
-            return nil
-        }
-        
-        guard
-            let dictionary = result as? [String: Any],
-            let data = dictionary[kSecValueData as String] as? Data
-        else {
-            return nil
-        }
-        
-        return String(data: data, encoding: .utf8)
+        implementation.get(stringForKey: key)
     }
     
     @discardableResult
     public func remove(valueForKey key: KeychainKey) -> Bool {
-        let query = keychainQuery(withService: service, forKey: key)
-        return SecItemDelete(query as CFDictionary) == noErr
+        implementation.remove(valueForKey: key)
     }
     
     public subscript(key: KeychainKey) -> String? {
